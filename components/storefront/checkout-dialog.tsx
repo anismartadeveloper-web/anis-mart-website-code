@@ -13,10 +13,14 @@ type Product = {
   imageUrl?: string | null
 }
 
+type CheckoutItem = { product: Product; quantity: number }
+
 type Props = {
   product: Product
   open: boolean
   onClose: () => void
+  cartItems?: CheckoutItem[]
+  onOrderCreated?: () => void
 }
 
 type SnapResult = {
@@ -47,7 +51,7 @@ const paymentOptions = [
   { value: 'OVO', label: 'OVO', detail: 'Dompet digital', tone: 'border-violet-300/20 bg-violet-300/10 text-violet-200' },
 ]
 
-export function CheckoutDialog({ product, open, onClose }: Props) {
+export function CheckoutDialog({ product, open, onClose, cartItems, onOrderCreated }: Props) {
   const router = useRouter()
   const addressId = useId()
   const [quantity, setQuantity] = useState(1)
@@ -59,7 +63,9 @@ export function CheckoutDialog({ product, open, onClose }: Props) {
   const [message, setMessage] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const quote = shippingQuote(deliveryMethod, coordinates?.latitude ?? null, coordinates?.longitude ?? null)
-  const total = product.price * quantity + quote.fee
+  const orderItems = cartItems ?? [{ product, quantity }]
+  const subtotal = orderItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  const total = subtotal + quote.fee
 
   if (!open) return null
 
@@ -88,8 +94,9 @@ export function CheckoutDialog({ product, open, onClose }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          product_id: product.id,
-          quantity,
+          ...(cartItems
+            ? { items: cartItems.map(({ product: cartProduct, quantity: cartQuantity }) => ({ product_id: cartProduct.id, quantity: cartQuantity })) }
+            : { product_id: product.id, quantity }),
           delivery_method: deliveryMethod,
           shipping_address: deliveryMethod === 'antar' ? address.trim() : 'Ambil di toko',
           latitude: deliveryMethod === 'antar' ? coordinates?.latitude ?? null : null,
@@ -100,6 +107,7 @@ export function CheckoutDialog({ product, open, onClose }: Props) {
       })
       const result: SnapResult = await response.json()
       if (!response.ok || !result.order) throw new Error(result.error || 'Pesanan tidak dapat dibuat.')
+      onOrderCreated?.()
 
       if (paymentMethod !== 'COD') {
         if (!result.snap_token || !window.snap) {
@@ -137,14 +145,19 @@ export function CheckoutDialog({ product, open, onClose }: Props) {
         <header className="flex items-start justify-between border-b border-white/10 px-5 py-4 sm:px-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-violet-300">Checkout aman</p>
-            <h2 id="checkout-title" className="mt-1 font-display text-xl font-bold text-white">{product.name}</h2>
+            <h2 id="checkout-title" className="mt-1 font-display text-xl font-bold text-white">{cartItems ? `${cartItems.length} produk di keranjang` : product.name}</h2>
             <span className="mt-2 inline-flex rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] font-semibold text-amber-200">Mode Sandbox · bukan uang asli</span>
           </div>
           <button type="button" onClick={onClose} className="grid size-10 place-items-center rounded-xl text-gray-400 hover:bg-white/10 hover:text-white" aria-label="Tutup checkout"><X className="size-5" /></button>
         </header>
 
         <div className="space-y-5 p-5 sm:p-6">
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[.03] p-4">
+          {cartItems ? <div className="max-h-48 space-y-2 overflow-y-auto rounded-2xl border border-white/10 bg-white/[.03] p-3">
+            {cartItems.map(({ product: cartProduct, quantity: cartQuantity }) => <div key={cartProduct.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/[.03] p-3">
+              <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{cartProduct.name}</p><p className="mt-1 text-xs text-gray-400">{cartQuantity} × {money(cartProduct.price)}</p></div>
+              <span className="shrink-0 text-sm font-semibold text-blue-300">{money(cartProduct.price * cartQuantity)}</span>
+            </div>)}
+          </div> : <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[.03] p-4">
             <div className="flex min-w-0 items-center gap-3">
               {product.imageUrl ? <img src={product.imageUrl} alt="" className="size-14 shrink-0 rounded-xl object-cover" /> : <div className="grid size-14 shrink-0 place-items-center rounded-xl bg-violet-500/15 text-xs font-bold text-violet-200">AM</div>}
               <div className="min-w-0"><p className="truncate text-sm font-semibold text-white">{product.name}</p><p className="mt-1 text-sm text-blue-300">{money(product.price)} / item</p></div>
@@ -154,7 +167,7 @@ export function CheckoutDialog({ product, open, onClose }: Props) {
               <span className="w-5 text-center text-sm font-semibold" aria-live="polite">{quantity}</span>
               <button type="button" disabled={quantity >= product.stock} onClick={() => setQuantity((value) => Math.min(product.stock, value + 1))} className="grid size-11 place-items-center rounded-lg text-white hover:bg-white/10 disabled:opacity-40" aria-label="Tambah jumlah">+</button>
             </div>
-          </div>
+          </div>}
 
           <fieldset>
             <legend className="mb-2 text-sm font-semibold text-white">Cara menerima pesanan</legend>
@@ -184,7 +197,7 @@ export function CheckoutDialog({ product, open, onClose }: Props) {
           </fieldset>
 
           <div className="space-y-2 border-t border-white/10 pt-4 text-sm">
-            <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>{money(product.price * quantity)}</span></div>
+            <div className="flex justify-between text-gray-400"><span>Subtotal</span><span>{money(subtotal)}</span></div>
             <div className="flex justify-between text-gray-400"><span>Ongkos kirim</span><span>{money(quote.fee)}</span></div>
             <div className="flex justify-between pt-1 font-bold text-white"><span>Total</span><span className="text-blue-300">{money(total)}</span></div>
             <p className="text-[11px] leading-relaxed text-gray-500">Total akhir dihitung kembali di server sebelum pesanan disimpan.</p>
@@ -192,7 +205,7 @@ export function CheckoutDialog({ product, open, onClose }: Props) {
 
           {message && <p role="alert" className="flex gap-2 rounded-xl border border-rose-400/20 bg-rose-500/10 p-3 text-sm text-rose-200"><AlertCircle className="mt-0.5 size-4 shrink-0" />{message}</p>}
           {success && <p role="status" className="flex gap-2 rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-3 text-sm text-emerald-200"><CheckCircle2 className="size-4 shrink-0" />Pesanan dibuat. Membuka konfirmasi…</p>}
-          <button type="button" onClick={submitOrder} disabled={loading || product.stock < 1} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 font-bold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="button" onClick={submitOrder} disabled={loading || orderItems.some((item) => item.product.stock < item.quantity)} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 px-4 font-bold text-white shadow-lg shadow-violet-950/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">
             {loading ? <Loader2 className="size-4 animate-spin" /> : null}{loading ? 'Memproses pesanan…' : paymentMethod === 'COD' ? 'Buat Pesanan' : 'Lanjutkan ke Pembayaran'}
           </button>
         </div>

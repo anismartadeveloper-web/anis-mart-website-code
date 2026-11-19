@@ -86,6 +86,122 @@ begin
 end;
 $$;
 
+create or replace function public.place_order(
+  p_items jsonb,
+  p_delivery_method text,
+  p_shipping_address text,
+  p_latitude double precision,
+  p_longitude double precision,
+  p_payment_method text
+)
+returns table(order_id uuid, subtotal numeric, shipping_fee numeric, total_price numeric, items jsonb)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_address text := nullif(btrim(p_shipping_address), '');
+  v_order_id uuid;
+  v_requested jsonb;
+  v_items jsonb := '[]'::jsonb;
+  v_item_count integer := 0;
+  v_processed integer := 0;
+  v_subtotal numeric(12,2) := 0;
+  v_shipping numeric(12,2) := 0;
+  v_total numeric(12,2);
+  v_distance double precision;
+  v_item record;
+  v_input_item jsonb;
+  v_quantity numeric;
+begin
+  if v_user_id is null then raise exception 'Silakan masuk untuk membuat pesanan.'; end if;
+  if not exists (select 1 from public.profiles p where p.id = v_user_id and p.is_active) then
+    raise exception 'Akun tidak aktif dan tidak dapat memesan.';
+  end if;
+  if p_items is null or jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) < 1 or jsonb_array_length(p_items) > 50 then
+    raise exception 'Daftar produk pesanan tidak valid.';
+  end if;
+  if p_delivery_method is null or p_delivery_method not in ('ambil', 'antar') then raise exception 'Metode pengiriman tidak valid.'; end if;
+  if p_payment_method is null or p_payment_method not in ('COD', 'DANA', 'GoPay', 'ShopeePay', 'OVO') then raise exception 'Metode pembayaran tidak valid.'; end if;
+  if p_delivery_method = 'antar' and (v_address is null or length(v_address) < 8 or length(v_address) > 500) then raise exception 'Alamat lengkap wajib diisi.'; end if;
+  if (p_latitude is null) <> (p_longitude is null) then raise exception 'Koordinat lokasi tidak lengkap.'; end if;
+  if p_latitude is not null and (p_latitude < -90 or p_latitude > 90 or p_longitude < -180 or p_longitude > 180) then raise exception 'Koordinat lokasi tidak valid.'; end if;
+
+  for v_input_item in select value from jsonb_array_elements(p_items) loop
+    if jsonb_typeof(v_input_item) <> 'object'
+      or jsonb_typeof(v_input_item -> 'product_id') is distinct from 'string'
+      or (v_input_item ->> 'product_id') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      or jsonb_typeof(v_input_item -> 'quantity') is distinct from 'number' then
+      raise exception 'Data produk pesanan tidak valid.';
+    end if;
+    v_quantity := (v_input_item ->> 'quantity')::numeric;
+    if v_quantity <> trunc(v_quantity) or v_quantity < 1 or v_quantity > 99 then
+      raise exception 'Jumlah pesanan tidak valid.';
+    end if;
+  end loop;
+
+  select jsonb_agg(jsonb_build_object('product_id', grouped.product_id, 'quantity', grouped.quantity) order by grouped.product_id), count(*)
+    into v_requested, v_item_count
+  from (
+    select (entry.value ->> 'product_id')::uuid as product_id, sum((entry.value ->> 'quantity')::integer)::integer as quantity
+    from jsonb_array_elements(p_items) as entry(value)
+    group by (entry.value ->> 'product_id')::uuid
+  ) as grouped;
+
+  if exists (
+    select 1 from jsonb_to_recordset(v_requested) as requested(product_id uuid, quantity integer)
+    where requested.quantity > 99
+  ) then raise exception 'Jumlah pesanan per produk tidak valid.'; end if;
+
+  for v_item in
+    select p.id, p.name, p.price, p.stock, requested.quantity
+    from jsonb_to_recordset(v_requested) as requested(product_id uuid, quantity integer)
+    join public.products p on p.id = requested.product_id
+    order by p.id
+    for update of p
+  loop
+    if v_item.stock < v_item.quantity then raise exception 'Stok tidak mencukupi untuk produk: %.', v_item.name; end if;
+    update public.products set stock = stock - v_item.quantity where id = v_item.id;
+    v_subtotal := v_subtotal + round(v_item.price * v_item.quantity, 2);
+    v_items := v_items || jsonb_build_array(jsonb_build_object(
+      'product_id', v_item.id,
+      'name', v_item.name,
+      'unit_price', v_item.price,
+      'quantity', v_item.quantity
+    ));
+    v_processed := v_processed + 1;
+  end loop;
+
+  if v_processed <> v_item_count then raise exception 'Satu atau lebih produk tidak ditemukan.'; end if;
+
+  if p_delivery_method = 'ambil' then
+    v_shipping := 0;
+  elsif p_latitude is null then
+    v_shipping := 10000;
+  else
+    v_distance := 6371 * 2 * asin(sqrt(
+      power(sin(radians(p_latitude - (-7.2575)) / 2), 2) +
+      cos(radians(-7.2575)) * cos(radians(p_latitude)) *
+      power(sin(radians(p_longitude - 112.7521) / 2), 2)
+    ));
+    v_shipping := greatest(5000, ceil(v_distance * 3000));
+  end if;
+  v_total := v_subtotal + v_shipping;
+
+  insert into public.orders (user_id, subtotal, shipping_fee, total_price, shipping_address, delivery_method, latitude, longitude, payment_method, payment_status, status, stock_restored)
+  values (v_user_id, v_subtotal, v_shipping, v_total, coalesce(v_address, 'Ambil di toko'), p_delivery_method, p_latitude, p_longitude, p_payment_method, case when p_payment_method = 'COD' then 'bayar di tempat' else 'belum dibayar' end, 'pending', false)
+  returning id into v_order_id;
+
+  insert into public.order_items (order_id, product_id, quantity, price)
+  select v_order_id, requested.product_id, requested.quantity, p.price
+  from jsonb_to_recordset(v_requested) as requested(product_id uuid, quantity integer)
+  join public.products p on p.id = requested.product_id;
+
+  return query select v_order_id, v_subtotal, v_shipping, v_total, v_items;
+end;
+$$;
+
 create or replace function public.cancel_order(p_order_id uuid)
 returns void
 language plpgsql
@@ -150,6 +266,8 @@ $$;
 
 revoke all on function public.place_order(uuid, integer, text, text, double precision, double precision, numeric, text) from public, anon;
 grant execute on function public.place_order(uuid, integer, text, text, double precision, double precision, numeric, text) to authenticated;
+revoke all on function public.place_order(jsonb, text, text, double precision, double precision, text) from public, anon;
+grant execute on function public.place_order(jsonb, text, text, double precision, double precision, text) to authenticated;
 revoke all on function public.cancel_order(uuid) from public, anon;
 grant execute on function public.cancel_order(uuid) to authenticated;
 revoke all on function public.attach_snap_token(uuid, text) from public, anon;
