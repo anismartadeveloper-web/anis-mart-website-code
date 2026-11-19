@@ -97,7 +97,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b0b0f] px-4 py-10 text-white sm:px-6">
+    <main className="relative flex min-h-screen items-center justify-center overflow-x-clip bg-[#0b0b0f] px-4 py-10 text-white sm:px-6">
       <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-10 size-72 rounded-full bg-blue-600/20 blur-[110px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-0 size-80 rounded-full bg-purple-600/20 blur-[120px]" />
       <section className="relative z-10 w-full max-w-[420px] rounded-[28px] border border-white/10 bg-[#121218]/90 p-6 shadow-2xl shadow-purple-950/30 backdrop-blur-xl sm:p-8">
