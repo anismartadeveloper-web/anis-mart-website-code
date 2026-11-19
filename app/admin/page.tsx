@@ -12,7 +12,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const [productsResult, ordersResult, customersResult, params] = await Promise.all([
     supabase.from('products').select('id, name, category, price, stock, image_url, description, created_at').order('created_at', { ascending: false }),
-    supabase.from('orders').select('id, user_id, total_price, shipping_address, payment_method, status, created_at, profiles(username), order_items(quantity, price, products(name))').order('created_at', { ascending: false }),
+    supabase.from('orders').select('id, user_id, subtotal, shipping_fee, total_price, shipping_address, delivery_method, payment_method, payment_status, status, created_at, profiles(username), order_items(quantity, price, products(name))').order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, username, email, role, is_active, created_at').eq('role', 'user').order('created_at', { ascending: false }),
     searchParams,
   ])

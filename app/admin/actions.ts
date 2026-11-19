@@ -61,9 +61,15 @@ export async function updateOrderStatus(formData: FormData) {
   const id = String(formData.get('id') ?? '')
   const status = String(formData.get('status') ?? '')
   if (!/^[0-9a-f-]{36}$/i.test(id) || !['pending', 'diproses', 'selesai', 'dibatalkan'].includes(status)) throw new Error('Status pesanan tidak valid.')
-  const { error } = await supabase.from('orders').update({ status }).eq('id', id)
-  if (error) throw new Error(`Status pesanan gagal diperbarui: ${error.message}`)
+  if (status === 'dibatalkan') {
+    const { error } = await supabase.rpc('cancel_order', { p_order_id: id })
+    if (error) throw new Error(`Pesanan gagal dibatalkan: ${error.message}`)
+  } else {
+    const { error } = await supabase.from('orders').update({ status }).eq('id', id)
+    if (error) throw new Error(`Status pesanan gagal diperbarui: ${error.message}`)
+  }
   revalidatePath('/admin')
+  revalidatePath('/pesanan-saya')
 }
 
 export async function setCustomerActive(formData: FormData) {

@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Anis Mart — Snack Ciki & Minuman Segar',
-  description: 'Toko snack dan minuman segar dengan katalog produk, stok real-time, dan Admin Console untuk kelola pesanan pelanggan.',
+  description: 'Belanja snack dan minuman segar di Anis Mart. Pilih cara pengiriman, cek ongkir, dan bayar dengan tunai atau dompet digital melalui checkout aman.'
   applicationName: 'Anis Mart',
 }
 
