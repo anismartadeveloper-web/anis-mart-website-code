@@ -25,6 +25,7 @@ function MapEvents({ onChange }: { onChange: (location: Coordinates) => void }) 
 function MapCenter({ latitude, longitude }: Coordinates) {
   const map = useMap()
   useEffect(() => {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return
     map.setView([latitude, longitude], map.getZoom(), { animate: true })
   }, [latitude, longitude, map])
   return null
@@ -35,6 +36,13 @@ export function LocationPickerMap({ latitude, longitude, onChange, className, sh
   className?: string
   showMarker?: boolean
 }) {
+  const validLatitude = Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
+  const validLongitude = Number.isFinite(longitude) && longitude >= -180 && longitude <= 180
+
+  if (!validLatitude || !validLongitude) {
+    return <div className={`${className ?? ''} grid place-items-center bg-white/[.03] p-4 text-center text-sm text-gray-400`} role="status">Masukkan koordinat yang valid untuk menampilkan peta.</div>
+  }
+
   return (
     <div className={className}>
       <MapContainer center={[latitude, longitude]} zoom={14} scrollWheelZoom className="h-full w-full">

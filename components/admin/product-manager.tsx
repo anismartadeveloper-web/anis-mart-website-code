@@ -166,7 +166,7 @@ function ProductManagerContent({ products }: { products: Product[] }) {
               <DialogTrigger render={<Button variant="outline" size="sm" onClick={() => setEditing(product)} />}><Pencil /> Edit</DialogTrigger>
               <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader><DialogTitle>Edit produk</DialogTitle><DialogDescription>Perbarui harga, promo, stok, foto, dan status katalog.</DialogDescription></DialogHeader>
-                {editing?.id === product.id && <ProductForm key={product.id} product={product} onSaved={() => setEditing(null)} onCancel={() => setEditing(null)} />}
+                {editing?.id === product.id && <ProductErrorBoundary key={product.id}><ProductForm product={product} onSaved={() => setEditing(null)} onCancel={() => setEditing(null)} /></ProductErrorBoundary>}
               </DialogContent>
             </Dialog>
             <Button variant="destructive" size="sm" disabled={busyId === product.id} onClick={() => removeProduct(product)}><Trash2 /> Hapus</Button>
@@ -195,8 +195,8 @@ class ProductErrorBoundary extends Component<{ children: ReactNode }, { error: E
         <section role="alert" className="rounded-2xl border border-rose-400/25 bg-rose-500/10 p-5 text-rose-100">
           <h3 className="font-semibold">Halaman Produk mengalami kendala</h3>
           <p className="mt-2 text-sm text-rose-200">{this.state.error.message || 'Terjadi kesalahan saat menampilkan data atau formulir produk.'}</p>
-          <button type="button" className="mt-4 min-h-10 rounded-lg border border-rose-300/30 px-3 text-sm font-semibold hover:bg-rose-400/10" onClick={() => window.location.reload()}>
-            Muat ulang halaman
+          <button type="button" className="mt-4 min-h-10 rounded-lg border border-rose-300/30 px-3 text-sm font-semibold hover:bg-rose-400/10" onClick={() => this.setState({ error: null })}>
+            Coba lagi
           </button>
         </section>
       )

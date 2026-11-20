@@ -18,6 +18,15 @@ export const productSchema = z.object({
 
 export type ProductInput = z.infer<typeof productSchema>
 
+const coordinateDraftSchema = (label: string, minimum: number, maximum: number) => z.string()
+  .trim()
+  .min(1, `${label} wajib diisi.`)
+  .transform((value) => Number(value.replace(',', '.')))
+  .pipe(z.number().finite(`${label} harus berupa angka.`).min(minimum, `${label} minimal ${minimum}.`).max(maximum, `${label} maksimal ${maximum}.`))
+
+export const storeLatitudeDraftSchema = coordinateDraftSchema('Latitude', -90, 90)
+export const storeLongitudeDraftSchema = coordinateDraftSchema('Longitude', -180, 180)
+
 export const storeSettingsSchema = z.object({
   store_name: z.string().trim().min(2).max(120),
   store_lat: z.number().finite().min(-90).max(90),
