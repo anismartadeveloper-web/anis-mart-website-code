@@ -4,14 +4,19 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useFormStatus } from 'react-dom'
-import { ArrowLeft, Boxes, ChartNoAxesCombined, CircleAlert, ClipboardList, ExternalLink, PackagePlus, ShieldCheck, ShoppingBag, Users } from 'lucide-react'
-import { createProduct, deleteProduct, setCustomerActive, updateOrderStatus, updateProduct } from '@/app/admin/actions'
+import { ArrowLeft, Boxes, ChartNoAxesCombined, CircleAlert, ClipboardList, ExternalLink, Menu, PackagePlus, Settings2, ShieldCheck, ShoppingBag, Users } from 'lucide-react'
+import { setCustomerActive, updateOrderStatus } from '@/app/admin/actions'
+import { ProductManager } from '@/components/admin/product-manager'
+import { StoreSettingsPanel } from '@/components/admin/store-settings-panel'
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
-type Product = { id: string; name: string; category: 'Snack' | 'Minuman'; price: number; stock: number; image_url: string | null; description: string | null; created_at: string }
+type Product = { id: string; sku: string; name: string; category: 'Snack' | 'Minuman'; price: number; promo_price: number | null; extra_shipping_fee: number; stock: number; is_active: boolean; image_url: string | null; image_path: string | null; description: string | null; created_at: string }
 type Customer = { id: string; username: string; email: string; role: string; is_active: boolean; created_at: string }
 type OrderItem = { quantity: number; price: number; products: { name: string } | null }
 type Order = { id: string; user_id: string; subtotal: number; shipping_fee: number; total_price: number; shipping_address: string; delivery_method: string; payment_method: string; payment_status: string; status: string; created_at: string; profiles: { username: string } | null; order_items: OrderItem[] }
-type AdminConsoleProps = { username: string; products: Product[]; orders: Order[]; customers: Customer[]; error?: string }
+type StoreSettings = { id: boolean; store_name: string; store_lat: number; store_lng: number; store_address: string; tarif_dasar: number; tarif_per_km: number; jarak_gratis_km: number; maks_jarak_km: number; ongkir_minimum: number; gratis_ongkir_min_belanja: number | null; updated_at: string }
+type PaymentMethod = { id: string; label: string; deskripsi: string; is_active: boolean; urutan: number }
+type AdminConsoleProps = { username: string; products: Product[]; orders: Order[]; customers: Customer[]; settings: StoreSettings; paymentMethods: PaymentMethod[]; error?: string }
 
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 const date = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -29,18 +34,9 @@ function SectionTitle({ eyebrow, title, text }: { eyebrow: string; title: string
   return <div className="mb-6"><p className="text-xs font-bold uppercase tracking-[.18em] text-blue-300">{eyebrow}</p><h2 className="mt-1 font-display text-2xl font-extrabold sm:text-3xl">{title}</h2><p className="mt-2 text-sm text-gray-400">{text}</p></div>
 }
 
-function ProductFields({ product }: { product?: Product }) {
-  return <div className="grid gap-3 sm:grid-cols-2">
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Nama produk<input className={fieldClass} name="name" required defaultValue={product?.name} placeholder="Contoh: Chitato Sapi Panggang" /></label>
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Kategori<select className={fieldClass} name="category" defaultValue={product?.category ?? 'Snack'}><option>Snack</option><option>Minuman</option></select></label>
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Harga (Rp)<input className={fieldClass} name="price" type="number" min="0" step="1" required defaultValue={product?.price} placeholder="11500" /></label>
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Stok<input className={fieldClass} name="stock" type="number" min="0" step="1" required defaultValue={product?.stock ?? 0} placeholder="20" /></label>
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300 sm:col-span-2">URL gambar<input className={fieldClass} name="image_url" type="url" defaultValue={product?.image_url ?? ''} placeholder="https://..." /></label>
-    <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300 sm:col-span-2">Deskripsi singkat<textarea className={`${fieldClass} min-h-20 py-3`} name="description" rows={2} defaultValue={product?.description ?? ''} placeholder="Ceritakan singkat tentang produk ini" /></label>
-  </div>
-}
 
-export function AdminConsole({ username, products, orders, customers, error }: AdminConsoleProps) {
+
+export function AdminConsole({ username, products, orders, customers, settings, paymentMethods, error }: AdminConsoleProps) {
   const [section, setSection] = useState('Overview')
   const [statusFilter, setStatusFilter] = useState('semua')
   const sections = [
@@ -48,6 +44,7 @@ export function AdminConsole({ username, products, orders, customers, error }: A
     { name: 'Produk', icon: Boxes },
     { name: 'Pesanan', icon: ClipboardList },
     { name: 'Manajemen Pelanggan', icon: Users },
+    { name: 'Pengaturan', icon: Settings2 },
   ]
   const lowStock = products.filter((product) => product.stock <= 10).sort((a, b) => a.stock - b.stock)
   const filteredOrders = statusFilter === 'semua' ? orders : orders.filter((order) => order.status === statusFilter)
@@ -58,9 +55,15 @@ export function AdminConsole({ username, products, orders, customers, error }: A
         <Link href="/" className="flex items-center gap-2.5"><span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600"><ShieldCheck className="size-5" /></span><span className="font-display text-lg font-extrabold">Anis<span className="text-violet-300">Mart</span><span className="ml-2 hidden text-xs font-medium text-gray-500 sm:inline">/ Admin Console</span></span></Link>
         <div className="flex items-center gap-2"><span className="hidden text-sm text-gray-400 sm:block">Halo, {username}</span><Link href="/" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-gray-200 transition hover:bg-white/10 sm:px-4 sm:text-sm"><ExternalLink className="size-4" />Lihat Toko</Link></div>
       </div>
-      <nav className="mx-auto flex max-w-[1500px] gap-1 overflow-x-auto px-3 pb-3 sm:px-6 lg:hidden" aria-label="Navigasi Admin Console">
-        {sections.map(({ name, icon: Icon }) => <button key={name} onClick={() => setSection(name)} aria-current={section === name ? 'page' : undefined} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-semibold transition ${section === name ? 'bg-violet-500/20 text-violet-100' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}><Icon className="size-4" />{name}</button>)}
-      </nav>
+      <div className="mx-auto flex max-w-[1500px] justify-end px-4 pb-3 lg:hidden">
+        <Sheet>
+          <SheetTrigger render={<button type="button" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-gray-200"><Menu className="size-4" />Navigasi admin</button>} />
+          <SheetContent side="left" className="border-white/10 bg-[#101016] text-white">
+            <SheetHeader><SheetTitle className="text-white">Menu Admin</SheetTitle></SheetHeader>
+            <nav className="flex flex-col gap-1 px-4" aria-label="Navigasi Admin Console">{sections.map(({ name, icon: Icon }) => <SheetClose key={name} render={<button type="button" onClick={() => setSection(name)} aria-current={section === name ? 'page' : undefined} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-medium ${section === name ? 'bg-violet-500/20 text-violet-100' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`} />}><Icon className="size-4" />{name}</SheetClose>)}</nav>
+          </SheetContent>
+        </Sheet>
+      </div>
     </header>
     <div className="mx-auto flex max-w-[1500px]">
       <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 shrink-0 flex-col border-r border-white/10 p-4 lg:flex">
@@ -84,16 +87,18 @@ export function AdminConsole({ username, products, orders, customers, error }: A
 
         {section === 'Produk' && <>
           <SectionTitle eyebrow="Katalog & inventaris" title="Produk" text="Tambahkan produk baru atau perbarui katalog dan stok yang tersedia." />
-          <form action={createProduct} className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-blue-600/[.08] to-violet-600/[.08] p-4 sm:p-6"><div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-violet-500/15 text-violet-200"><PackagePlus className="size-5" /></span><div><h3 className="font-display font-bold">Tambah produk</h3><p className="text-xs text-gray-400">Produk akan langsung tampil di katalog.</p></div></div><ProductFields /><div className="mt-4"><SubmitButton>Tambah produk</SubmitButton></div></form>
-          <div className="mt-8"><h3 className="mb-3 font-display text-lg font-bold">Semua produk <span className="text-sm font-medium text-gray-500">({products.length})</span></h3>
-            {products.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-gray-400">Belum ada produk. Tambahkan produk pertama di atas.</div> : <div className="grid gap-4 xl:grid-cols-2">{products.map((product) => <article key={product.id} className="overflow-hidden rounded-2xl border border-white/10 bg-[#121218]"><div className="flex items-center gap-3 border-b border-white/5 p-4"><div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-gradient-to-br from-blue-500/20 to-violet-500/20">{product.image_url ? <Image src={product.image_url} alt={product.name} width={56} height={56} unoptimized className="size-14 object-cover" /> : <Boxes className="size-6 text-violet-200" />}</div><div className="min-w-0 flex-1"><h4 className="truncate font-semibold">{product.name}</h4><p className="text-xs text-violet-300">{product.category} · {money(product.price)} · Stok {product.stock}</p></div></div><form action={updateProduct} className="flex flex-col gap-3 p-4"><input type="hidden" name="id" value={product.id} /><ProductFields product={product} /><div className="flex flex-wrap items-center justify-between gap-2"><SubmitButton>Simpan perubahan</SubmitButton></div></form><form action={deleteProduct} className="border-t border-white/5 px-4 py-3"><input type="hidden" name="id" value={product.id} /><button className="min-h-10 rounded-lg px-3 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/10">Hapus produk</button></form></article>)}</div>}
-          </div>
+          <ProductManager products={products} />
         </>}
 
         {section === 'Pesanan' && <>
           <SectionTitle eyebrow="Operasional toko" title="Pesanan" text="Lihat detail pesanan pelanggan dan perbarui status pemrosesannya." />
           <label className="mb-4 flex max-w-xs flex-col gap-1.5 text-xs font-medium text-gray-300">Filter status<select className={fieldClass} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="semua">Semua status</option>{Object.entries(statusText).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           {filteredOrders.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center"><ShoppingBag className="mx-auto size-8 text-gray-600" /><h3 className="mt-3 font-semibold">Belum ada pesanan</h3><p className="mt-1 text-sm text-gray-500">Pesanan pelanggan akan muncul di sini.</p></div> : <div className="grid gap-4">{filteredOrders.map((order) => <article key={order.id} className="rounded-2xl border border-white/10 bg-[#121218] p-4 sm:p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs text-gray-500">{date(order.created_at)}</p><h3 className="mt-1 font-semibold">{order.profiles?.username ?? 'Pelanggan'}</h3></div><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusTone[order.status] ?? statusTone.pending}`}>{statusText[order.status] ?? order.status}</span></div><div className="mt-4 grid gap-4 border-t border-white/5 pt-4 sm:grid-cols-2"><div><p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Produk</p><ul className="mt-2 flex flex-col gap-1 text-sm text-gray-200">{(order.order_items ?? []).map((item, index) => <li key={`${order.id}-${index}`}>{item.products?.name ?? 'Produk dihapus'} <span className="text-gray-500">× {item.quantity}</span></li>)}</ul><p className="mt-2 text-xs text-gray-400">Pembayaran: {order.payment_method} · {order.payment_status}</p></div><div><p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Ringkasan pembayaran</p><p className="mt-2 text-sm text-gray-300">Subtotal {money(order.subtotal)}</p><p className="mt-1 text-sm text-gray-300">Ongkir {money(order.shipping_fee)}</p><p className="mt-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Lokasi</p><p className="mt-1 text-sm leading-relaxed text-gray-300">{order.delivery_method === 'ambil' ? 'Ambil di toko' : order.shipping_address}</p><p className="mt-3 text-lg font-bold text-blue-200">Total {money(order.total_price)}</p></div></div><form action={updateOrderStatus} className="mt-4 flex flex-col gap-2 border-t border-white/5 pt-4 sm:flex-row sm:items-end"><input type="hidden" name="id" value={order.id} /><label className="flex flex-1 flex-col gap-1.5 text-xs font-medium text-gray-300">Ubah status<select className={fieldClass} name="status" defaultValue={order.status}>{Object.entries(statusText).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><SubmitButton>Perbarui status</SubmitButton></form></article>)}</div>}
+        </>}
+
+        {section === 'Pengaturan' && <>
+          <SectionTitle eyebrow="Konfigurasi toko" title="Pengaturan" text="Atur titik toko, ongkir, dan metode pembayaran yang tersedia di checkout." />
+          <StoreSettingsPanel settings={settings} paymentMethods={paymentMethods} />
         </>}
 
         {section === 'Manajemen Pelanggan' && <>

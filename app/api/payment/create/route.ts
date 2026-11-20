@@ -2,10 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
 const paymentTypes: Record<string, string> = {
-  DANA: 'dana',
-  GoPay: 'gopay',
-  ShopeePay: 'shopeepay',
-  OVO: 'ovo',
+  dana: 'dana',
+  gopay: 'gopay',
+  shopeepay: 'shopeepay',
+  ovo: 'ovo',
 }
 
 export async function POST(req: NextRequest) {
@@ -36,11 +36,12 @@ export async function POST(req: NextRequest) {
       if (!Number.isInteger(quantity) || (quantity as number) < 1 || (quantity as number) > 99) return NextResponse.json({ error: 'Jumlah pesanan tidak valid.' }, { status: 400 })
     }
     if (delivery_method !== 'ambil' && delivery_method !== 'antar') return NextResponse.json({ error: 'Metode pengiriman tidak valid.' }, { status: 400 })
-    if (typeof payment_method !== 'string' || (payment_method !== 'COD' && !paymentTypes[payment_method])) return NextResponse.json({ error: 'Metode pembayaran tidak valid.' }, { status: 400 })
+    if (typeof payment_method !== 'string' || (payment_method !== 'cod' && !paymentTypes[payment_method])) return NextResponse.json({ error: 'Metode pembayaran tidak valid.' }, { status: 400 })
     if (delivery_method === 'antar' && (typeof shipping_address !== 'string' || shipping_address.trim().length < 8 || shipping_address.length > 500)) return NextResponse.json({ error: 'Masukkan alamat pengiriman yang lengkap.' }, { status: 400 })
 
-    const validCoordinate = (value: unknown, min: number, max: number) => value === null || (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max)
-    if (!validCoordinate(latitude, -90, 90) || !validCoordinate(longitude, -180, 180)) return NextResponse.json({ error: 'Koordinat lokasi tidak valid.' }, { status: 400 })
+    const validCoordinate = (value: unknown, min: number, max: number) => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max
+    if (delivery_method === 'antar' && (!validCoordinate(latitude, -90, 90) || !validCoordinate(longitude, -180, 180))) return NextResponse.json({ error: 'Pilih lokasi pengiriman pada peta terlebih dahulu.' }, { status: 400 })
+    if (delivery_method === 'ambil' && ((latitude !== null && latitude !== undefined) || (longitude !== null && longitude !== undefined))) return NextResponse.json({ error: 'Koordinat tidak diperlukan untuk ambil di toko.' }, { status: 400 })
 
     const orderArguments = {
       p_delivery_method: delivery_method,
@@ -49,20 +50,14 @@ export async function POST(req: NextRequest) {
       p_longitude: typeof longitude === 'number' ? longitude : null,
       p_payment_method: payment_method,
     }
-    const { data, error } = isCartOrder
-      ? await supabase.rpc('place_order', { ...orderArguments, p_items: cartItems })
-      : await supabase.rpc('place_order', {
-          ...orderArguments,
-          p_product_id: product_id,
-          p_quantity: quantity,
-          p_shipping_fee: 0,
-        })
+    const normalizedItems = isCartOrder ? cartItems : [{ product_id: product_id as string, quantity: quantity as number }]
+    const { data, error } = await supabase.rpc('place_order', { ...orderArguments, p_items: normalizedItems })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     const order = data?.[0]
     if (!order) return NextResponse.json({ error: 'Pesanan tidak dapat dibuat.' }, { status: 500 })
 
-    if (payment_method === 'COD') return NextResponse.json({ success: true, order })
+    if (payment_method === 'cod') return NextResponse.json({ success: true, order })
 
     const serverKey = process.env.MIDTRANS_SERVER_KEY
     if (!serverKey) {

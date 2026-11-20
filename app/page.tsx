@@ -9,7 +9,7 @@ export default async function HomePage() {
 
   const [{ data: profile }, { data: productRows, error: productError }] = await Promise.all([
     supabase.from('profiles').select('username, email, role, is_active').eq('id', user.id).maybeSingle(),
-    supabase.from('products').select('id, name, category, price, stock, image_url, description').order('created_at', { ascending: false }),
+    supabase.from('products_public').select('id, name, category, price, promo_price, stock, image_url, description').order('id'),
   ])
   if (profile?.is_active === false) redirect('/akun-nonaktif')
 
@@ -19,6 +19,7 @@ export default async function HomePage() {
     category: product.category as 'Snack' | 'Minuman',
     detail: product.description || product.category,
     price: Number(product.price),
+    promoPrice: product.promo_price === null ? null : Number(product.promo_price),
     stock: product.stock,
     imageUrl: product.image_url,
     color: index % 2 === 0 ? 'from-blue-500/20 to-violet-500/10' : 'from-amber-500/20 to-rose-500/10',

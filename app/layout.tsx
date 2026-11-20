@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next'
+import { Toaster } from 'sonner'
+import 'leaflet/dist/leaflet.css'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -15,5 +17,5 @@ export const viewport: Viewport = {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="id"><body className="antialiased">{children}</body></html>
+  return <html lang="id"><body className="antialiased">{children}<Toaster position="bottom-right" theme="dark" richColors closeButton /></body></html>
 }
