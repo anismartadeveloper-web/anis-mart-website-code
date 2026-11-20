@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { Component, useState, useTransition, type ErrorInfo, type ReactNode } from 'react'
 import Image from 'next/image'
 import imageCompression from 'browser-image-compression'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -78,6 +78,9 @@ function ProductForm({ product, onSaved, onCancel }: { product?: Product; onSave
   return (
     <form onSubmit={form.handleSubmit(submit)} className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">SKU
+          <input className={fieldClass} value={product?.sku ?? 'Dibuat otomatis saat disimpan'} readOnly aria-label="SKU produk" />
+        </label>
         <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Nama produk
           <input className={fieldClass} maxLength={120} {...form.register('name')} placeholder="Contoh: Keripik singkong" />
           {errors.name && <span className="text-rose-300">{errors.name.message}</span>}
@@ -102,7 +105,7 @@ function ProductForm({ product, onSaved, onCancel }: { product?: Product; onSave
           {errors.extra_shipping_fee && <span className="text-rose-300">{errors.extra_shipping_fee.message}</span>}
         </label>
         <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300 sm:col-span-2">Deskripsi
-          <textarea className={`${fieldClass} min-h-20 py-3`} rows={2} maxLength={1000} {...form.register('description', { setValueAs: (value) => value.trim() || null })} placeholder="Deskripsi singkat untuk katalog" />
+          <textarea className={`${fieldClass} min-h-20 py-3`} rows={2} maxLength={1000} {...form.register('description', { setValueAs: (value) => String(value ?? '').trim() || null })} placeholder="Deskripsi singkat untuk katalog" />
         </label>
       </div>
 
@@ -130,7 +133,7 @@ function ProductForm({ product, onSaved, onCancel }: { product?: Product; onSave
   )
 }
 
-export function ProductManager({ products }: { products: Product[] }) {
+function ProductManagerContent({ products }: { products: Product[] }) {
   const [editing, setEditing] = useState<Product | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const lowStock = products.filter((product) => product.stock <= 10).sort((a, b) => a.stock - b.stock)
@@ -173,4 +176,36 @@ export function ProductManager({ products }: { products: Product[] }) {
       {lowStock.length > 0 && <p className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/10 p-3 text-xs text-amber-100">Perhatian: {lowStock.length} produk memiliki stok 10 atau kurang.</p>}
     </section>
   </div>
+}
+
+class ProductErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[admin] Product page failed to render:', error, info.componentStack)
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <section role="alert" className="rounded-2xl border border-rose-400/25 bg-rose-500/10 p-5 text-rose-100">
+          <h3 className="font-semibold">Halaman Produk mengalami kendala</h3>
+          <p className="mt-2 text-sm text-rose-200">{this.state.error.message || 'Terjadi kesalahan saat menampilkan data atau formulir produk.'}</p>
+          <button type="button" className="mt-4 min-h-10 rounded-lg border border-rose-300/30 px-3 text-sm font-semibold hover:bg-rose-400/10" onClick={() => window.location.reload()}>
+            Muat ulang halaman
+          </button>
+        </section>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
+export function ProductManager({ products }: { products: Product[] }) {
+  return <ProductErrorBoundary><ProductManagerContent products={products} /></ProductErrorBoundary>
 }

@@ -19,14 +19,6 @@ function validId(id: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 }
 
-async function nextSku(supabase: Awaited<ReturnType<typeof createClient>>, category: ProductInput['category']) {
-  const prefix = category === 'Snack' ? 'NS' : 'MN'
-  const { data, error } = await supabase.from('products').select('sku').like('sku', `${prefix}-%`)
-  if (error) throw new Error('SKU produk tidak dapat dibuat. Coba kembali.')
-  const highest = (data ?? []).reduce((max, row) => Math.max(max, Number(String(row.sku).match(/-(\d+)$/)?.[1] ?? 0)), 0)
-  return `${prefix}-${String(highest + 1).padStart(3, '0')}`
-}
-
 async function removeStoredImage(supabase: Awaited<ReturnType<typeof createClient>>, path: string | null) {
   if (!path) return
   const { error } = await supabase.storage.from('product-images').remove([path])
@@ -37,16 +29,8 @@ export async function createProduct(input: ProductInput) {
   const supabase = await requireAdmin()
   const parsed = productSchema.safeParse(input)
   if (!parsed.success) throw new Error('Data produk tidak valid. Periksa harga, promo, kategori, dan stok.')
-  let sku = await nextSku(supabase, parsed.data.category)
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const { error } = await supabase.from('products').insert({ ...parsed.data, sku })
-    if (!error) break
-    if (error.code === '23505' && attempt < 2) {
-      sku = await nextSku(supabase, parsed.data.category)
-      continue
-    }
-    throw new Error(`Produk gagal disimpan: ${error.code === '23505' ? 'SKU bentrok, coba simpan kembali.' : error.message}`)
-  }
+  const { error } = await supabase.from('products').insert(parsed.data)
+  if (error) throw new Error(`Produk gagal disimpan: ${error.message}`)
   revalidatePath('/admin')
   revalidatePath('/')
 }
