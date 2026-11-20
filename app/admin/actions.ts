@@ -105,9 +105,7 @@ export async function setCustomerActive(formData: FormData) {
   const id = String(formData.get('id') ?? '')
   const isActive = String(formData.get('is_active') ?? '') === 'true'
   if (!validId(id)) throw new Error('ID pelanggan tidak valid.')
-  const { data: target } = await supabase.from('profiles').select('role').eq('id', id).maybeSingle()
-  if (target?.role !== 'user') throw new Error('Hanya akun pelanggan yang dapat diubah.')
-  const { error } = await supabase.from('profiles').update({ is_active: isActive }).eq('id', id)
+  const { error } = await supabase.rpc('admin_set_customer_active', { target_user: id, new_active: isActive })
   if (error) throw new Error(`Status akun gagal diperbarui: ${error.message}`)
   revalidatePath('/admin')
 }

@@ -30,8 +30,8 @@ export function AuthForm({ mode }: AuthFormProps) {
     try {
       if (isRegister) {
         const normalizedUsername = username.trim()
-        if (!/^[\p{L}\p{N}_]{3,24}$/u.test(normalizedUsername)) {
-          setMessage('Username harus 3–24 karakter, hanya huruf, angka, atau garis bawah.')
+        if (!/^[a-z0-9._]{3,20}$/.test(normalizedUsername)) {
+          setMessage('Username harus 3–20 karakter: huruf kecil, angka, titik, atau garis bawah.')
           return
         }
         const { data: available, error: availabilityError } = await supabase.rpc('is_username_available', {
@@ -111,8 +111,8 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         <form className="mt-7 flex flex-col gap-4" onSubmit={handleSubmit}>
           {isRegister && <label className="flex flex-col gap-2 text-sm font-medium text-gray-200">Username
-            <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" minLength={3} maxLength={24} required placeholder="contoh: anis_mart" className="h-12 rounded-xl border border-white/10 bg-[#0b0b0f] px-4 text-base text-white outline-none transition placeholder:text-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20" />
-            <span className="text-xs font-normal text-gray-500">3–24 karakter, huruf, angka, dan garis bawah.</span>
+            <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" autoCapitalize="none" minLength={3} maxLength={20} required placeholder="contoh: anis.mart" className="h-12 rounded-xl border border-white/10 bg-[#0b0b0f] px-4 text-base text-white outline-none transition placeholder:text-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20" />
+            <span className="text-xs font-normal text-gray-500">3–20 karakter, huruf kecil, angka, titik, dan garis bawah.</span>
           </label>}
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-200">Alamat email
             <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required placeholder="nama@email.com" className="h-12 rounded-xl border border-white/10 bg-[#0b0b0f] px-4 text-base text-white outline-none transition placeholder:text-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20" />

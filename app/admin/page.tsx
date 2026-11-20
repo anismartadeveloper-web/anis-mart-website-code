@@ -6,14 +6,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: profile } = await supabase.from('profiles').select('role, username, is_active').eq('id', user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('role, username, display_name, avatar_url, is_active').eq('id', user.id).maybeSingle()
   if (profile?.is_active === false) redirect('/akun-nonaktif')
   if (profile?.role !== 'admin') redirect('/')
 
   const [productsResult, ordersResult, customersResult, settingsResult, paymentMethodsResult, params] = await Promise.all([
     supabase.from('products').select('id, sku, name, category, price, promo_price, extra_shipping_fee, stock, is_active, image_url, image_path, description, unit_size, unit_label, unit_note, created_at').order('created_at', { ascending: false }),
     supabase.from('orders').select('id, user_id, subtotal, shipping_fee, total_price, shipping_address, delivery_method, payment_method, payment_status, status, created_at, profiles(username), order_items(quantity, price, products(name))').order('created_at', { ascending: false }),
-    supabase.from('profiles').select('id, username, email, role, is_active, created_at').eq('role', 'user').order('created_at', { ascending: false }),
+    supabase.rpc('admin_list_customers'),
     supabase.from('store_settings').select('id, store_name, store_lat, store_lng, store_address, tarif_dasar, tarif_per_km, jarak_gratis_km, maks_jarak_km, ongkir_minimum, gratis_ongkir_min_belanja, updated_at').eq('id', true).maybeSingle(),
     supabase.from('payment_methods').select('id, label, deskripsi, is_active, urutan').order('urutan'),
     searchParams,
@@ -22,6 +22,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   return <AdminConsole
     username={profile.username ?? 'Admin'}
+    displayName={profile.display_name?.trim() || profile.username || 'Admin'}
+    email={user.email ?? ''}
+    avatarUrl={profile.avatar_url}
     products={(productsResult.data ?? []) as never[]}
     orders={(ordersResult.data ?? []) as never[]}
     customers={(customersResult.data ?? []) as never[]}

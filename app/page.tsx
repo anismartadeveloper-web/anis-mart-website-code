@@ -8,7 +8,7 @@ export default async function HomePage() {
   if (!user) redirect('/login')
 
   const [{ data: profile }, { data: productRows, error: productError }] = await Promise.all([
-    supabase.from('profiles').select('username, email, role, is_active').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('username, display_name, avatar_url, role, is_active').eq('id', user.id).maybeSingle(),
     supabase.from('products_public').select('id, name, category, price, promo_price, stock, image_url, description, unit_size, unit_label, unit_note').order('id'),
   ])
   if (profile?.is_active === false) redirect('/akun-nonaktif')
@@ -31,8 +31,10 @@ export default async function HomePage() {
   return <Storefront
     profile={{
       username: profile?.username ?? user.user_metadata?.username ?? 'Pengguna',
-      email: profile?.email ?? user.email ?? '',
+      displayName: profile?.display_name?.trim() || profile?.username || user.user_metadata?.username || 'Pengguna',
+      email: user.email ?? '',
       role: profile?.role === 'admin' ? 'admin' : 'user',
+      avatarUrl: profile?.avatar_url ?? null,
     }}
     products={products}
     catalogError={productError ? 'Katalog belum dapat dimuat saat ini.' : undefined}

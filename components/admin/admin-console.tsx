@@ -8,15 +8,17 @@ import { ArrowLeft, Boxes, ChartNoAxesCombined, CircleAlert, ClipboardList, Exte
 import { setCustomerActive, updateOrderStatus } from '@/app/admin/actions'
 import { ProductManager } from '@/components/admin/product-manager'
 import { StoreSettingsPanel } from '@/components/admin/store-settings-panel'
+import { AccountCard } from '@/components/account/account-card'
+import { AccountAvatar } from '@/components/account/account-avatar'
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
 type Product = { id: string; sku: string; name: string; category: 'Snack' | 'Minuman'; price: number; promo_price: number | null; extra_shipping_fee: number; stock: number; is_active: boolean; image_url: string | null; image_path: string | null; description: string | null; unit_size: number | null; unit_label: string | null; unit_note: string | null; created_at: string }
-type Customer = { id: string; username: string; email: string; role: string; is_active: boolean; created_at: string }
+type Customer = { id: string; is_active: boolean; created_at: string }
 type OrderItem = { quantity: number; price: number; products: { name: string } | null }
 type Order = { id: string; user_id: string; subtotal: number; shipping_fee: number; total_price: number; shipping_address: string; delivery_method: string; payment_method: string; payment_status: string; status: string; created_at: string; profiles: { username: string } | null; order_items: OrderItem[] }
 type StoreSettings = { id: boolean; store_name: string; store_lat: number; store_lng: number; store_address: string; tarif_dasar: number; tarif_per_km: number; jarak_gratis_km: number; maks_jarak_km: number; ongkir_minimum: number; gratis_ongkir_min_belanja: number | null; updated_at: string }
 type PaymentMethod = { id: string; label: string; deskripsi: string; is_active: boolean; urutan: number }
-type AdminConsoleProps = { username: string; products: Product[]; orders: Order[]; customers: Customer[]; settings: StoreSettings; paymentMethods: PaymentMethod[]; error?: string }
+type AdminConsoleProps = { username: string; displayName: string; email: string; avatarUrl: string | null; products: Product[]; orders: Order[]; customers: Customer[]; settings: StoreSettings; paymentMethods: PaymentMethod[]; error?: string }
 
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 const date = (value: string) => new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -36,7 +38,7 @@ function SectionTitle({ eyebrow, title, text }: { eyebrow: string; title: string
 
 
 
-export function AdminConsole({ username, products, orders, customers, settings, paymentMethods, error }: AdminConsoleProps) {
+export function AdminConsole({ username, displayName, email, avatarUrl, products, orders, customers, settings, paymentMethods, error }: AdminConsoleProps) {
   const [section, setSection] = useState('Overview')
   const [statusFilter, setStatusFilter] = useState('semua')
   const sections = [
@@ -53,13 +55,14 @@ export function AdminConsole({ username, products, orders, customers, settings, 
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#0b0b0f]/90 backdrop-blur-xl">
       <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5"><span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600"><ShieldCheck className="size-5" /></span><span className="font-display text-lg font-extrabold">Anis<span className="text-violet-300">Mart</span><span className="ml-2 hidden text-xs font-medium text-gray-500 sm:inline">/ Admin Console</span></span></Link>
-        <div className="flex items-center gap-2"><span className="hidden text-sm text-gray-400 sm:block">Halo, {username}</span><Link href="/" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-gray-200 transition hover:bg-white/10 sm:px-4 sm:text-sm"><ExternalLink className="size-4" />Lihat Toko</Link></div>
+        <div className="flex items-center gap-2"><span className="hidden text-sm text-gray-400 sm:block">Halo, {displayName}</span><Link href="/akun" aria-label="Buka info akun" className="grid size-10 place-items-center rounded-full border border-white/10 transition hover:border-violet-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"><AccountAvatar src={avatarUrl} name={displayName} size="size-8" /></Link><Link href="/" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-gray-200 transition hover:bg-white/10 sm:px-4 sm:text-sm"><ExternalLink className="size-4" />Lihat Toko</Link></div>
       </div>
       <div className="mx-auto flex max-w-[1500px] justify-end px-4 pb-3 lg:hidden">
         <Sheet>
           <SheetTrigger render={<button type="button" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-gray-200"><Menu className="size-4" />Navigasi admin</button>} />
           <SheetContent side="left" className="border-white/10 bg-[#101016] text-white">
             <SheetHeader><SheetTitle className="text-white">Menu Admin</SheetTitle></SheetHeader>
+            <div className="px-4 pb-3"><AccountCard username={username} displayName={displayName} email={email} role="admin" avatarUrl={avatarUrl} /></div>
             <nav className="flex flex-col gap-1 px-4" aria-label="Navigasi Admin Console">{sections.map(({ name, icon: Icon }) => <SheetClose key={name} render={<button type="button" onClick={() => setSection(name)} aria-current={section === name ? 'page' : undefined} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-medium ${section === name ? 'bg-violet-500/20 text-violet-100' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`} />}><Icon className="size-4" />{name}</SheetClose>)}</nav>
           </SheetContent>
         </Sheet>
@@ -67,7 +70,8 @@ export function AdminConsole({ username, products, orders, customers, settings, 
     </header>
     <div className="mx-auto flex max-w-[1500px]">
       <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-64 shrink-0 flex-col border-r border-white/10 p-4 lg:flex">
-        <p className="px-3 pb-3 pt-2 text-[10px] font-bold uppercase tracking-[.2em] text-gray-500">Menu Admin</p>
+        <AccountCard username={username} displayName={displayName} email={email} role="admin" avatarUrl={avatarUrl} />
+        <p className="px-3 pb-3 pt-5 text-[10px] font-bold uppercase tracking-[.2em] text-gray-500">Menu Admin</p>
         <nav className="flex flex-col gap-1" aria-label="Navigasi Admin Console">{sections.map(({ name, icon: Icon }) => <button key={name} onClick={() => setSection(name)} aria-current={section === name ? 'page' : undefined} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition ${section === name ? 'bg-gradient-to-r from-blue-600/20 to-violet-600/20 text-white ring-1 ring-violet-400/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}><Icon className={`size-4 ${section === name ? 'text-violet-300' : ''}`} />{name}</button>)}</nav>
         <Link href="/" className="mt-auto flex min-h-12 items-center gap-3 rounded-xl px-3 text-sm font-medium text-gray-400 transition hover:bg-white/5 hover:text-white"><ArrowLeft className="size-4" />Lihat Toko</Link>
       </aside>
@@ -103,7 +107,7 @@ export function AdminConsole({ username, products, orders, customers, settings, 
 
         {section === 'Manajemen Pelanggan' && <>
           <SectionTitle eyebrow="Akun & akses" title="Manajemen Pelanggan" text="Kelola akses akun pelanggan. Akun nonaktif akan dialihkan ke halaman pemberitahuan." />
-          {customers.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center"><Users className="mx-auto size-8 text-gray-600" /><h3 className="mt-3 font-semibold">Belum ada pelanggan</h3><p className="mt-1 text-sm text-gray-500">Akun dengan role user akan tercantum di sini.</p></div> : <div className="grid gap-3">{customers.map((customer) => <article key={customer.id} className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#121218] p-4 sm:flex-row sm:items-center"><div className="grid size-11 shrink-0 place-items-center rounded-full border border-violet-400/20 bg-violet-500/10 font-bold text-violet-200">{customer.username.slice(0, 1).toUpperCase()}</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">{customer.username}</p><p className="truncate text-sm text-gray-400">{customer.email}</p><p className="mt-1 text-xs text-gray-600">Bergabung {date(customer.created_at)}</p></div><div className="flex items-center justify-between gap-3 sm:justify-end"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${customer.is_active ? statusTone.selesai : statusTone.dibatalkan}`}>{customer.is_active ? 'Aktif' : 'Nonaktif'}</span><form action={setCustomerActive}><input type="hidden" name="id" value={customer.id} /><input type="hidden" name="is_active" value={String(!customer.is_active)} /><SubmitButton>{customer.is_active ? 'Nonaktifkan' : 'Aktifkan'}</SubmitButton></form></div></article>)}</div>}
+          {customers.length === 0 ? <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center"><Users className="mx-auto size-8 text-gray-600" /><h3 className="mt-3 font-semibold">Belum ada pelanggan</h3><p className="mt-1 text-sm text-gray-500">Akun dengan role user akan tercantum di sini.</p></div> : <div className="grid gap-3">{customers.map((customer) => <article key={customer.id} className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-[#121218] p-4 sm:flex-row sm:items-center"><div className="grid size-11 shrink-0 place-items-center rounded-full border border-violet-400/20 bg-violet-500/10 font-bold text-violet-200">P</div><div className="min-w-0 flex-1"><p className="truncate font-semibold">Akun pelanggan</p><p className="mt-1 text-xs text-gray-600">Bergabung {date(customer.created_at)}</p></div><div className="flex items-center justify-between gap-3 sm:justify-end"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${customer.is_active ? statusTone.selesai : statusTone.dibatalkan}`}>{customer.is_active ? 'Aktif' : 'Nonaktif'}</span><form action={setCustomerActive}><input type="hidden" name="id" value={customer.id} /><input type="hidden" name="is_active" value={String(!customer.is_active)} /><SubmitButton>{customer.is_active ? 'Nonaktifkan' : 'Aktifkan'}</SubmitButton></form></div></article>)}</div>}
         </>}
       </main>
     </div>
