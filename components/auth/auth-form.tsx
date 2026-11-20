@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, LoaderCircle, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, LoaderCircle } from 'lucide-react'
+import { BrandLogo } from '@/components/brand-logo'
 import { createClient } from '@/lib/supabase/client'
 
 type AuthFormProps = { mode: 'login' | 'register' }
@@ -101,9 +102,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-10 size-72 rounded-full bg-blue-600/20 blur-[110px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-0 size-80 rounded-full bg-purple-600/20 blur-[120px]" />
       <section className="relative z-10 w-full max-w-[420px] rounded-[28px] border border-white/10 bg-[#121218]/90 p-6 shadow-2xl shadow-purple-950/30 backdrop-blur-xl sm:p-8">
-        <Link href="/" className="mb-8 inline-flex items-center gap-2.5" aria-label="Anis Mart">
-          <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 shadow-lg shadow-purple-900/40"><Sparkles aria-hidden="true" className="size-5" /></span>
-          <span className="font-display text-2xl font-extrabold tracking-tight">Anis<span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">Mart</span></span>
+        <Link href="/" className="mb-8 flex w-full justify-center" aria-label="Anis Mart, ke beranda">
+          <BrandLogo variant="auth" />
         </Link>
         <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-blue-300">{isRegister ? 'Selamat datang' : 'Senang bertemu kembali'}</p>
         <h1 className="font-display text-3xl font-extrabold tracking-tight">{isRegister ? 'Buat akun' : 'Masuk ke akun'}</h1>
