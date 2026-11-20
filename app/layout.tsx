@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next'
+import { Toaster } from 'sonner'
+import 'leaflet/dist/leaflet.css'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Anis Mart — Snack Ciki & Minuman Segar',
-  description: 'Pilih snack ciki favorit dan minuman dingin segar dari Anis Mart. Praktis, tinggal klik, siap diantar.',
+  description: 'Belanja snack dan minuman segar di Anis Mart. Pilih cara pengiriman, cek ongkir, dan bayar dengan tunai atau dompet digital melalui checkout aman.',
   applicationName: 'Anis Mart',
 }
 
@@ -15,5 +17,5 @@ export const viewport: Viewport = {
 }
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="id"><body className="antialiased">{children}</body></html>
+  return <html lang="id"><body className="antialiased">{children}<Toaster position="bottom-right" theme="dark" richColors closeButton /></body></html>
 }

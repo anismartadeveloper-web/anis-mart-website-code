@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, LoaderCircle, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, LoaderCircle } from 'lucide-react'
+import { BrandLogo } from '@/components/brand-logo'
 import { createClient } from '@/lib/supabase/client'
 
 type AuthFormProps = { mode: 'login' | 'register' }
@@ -30,8 +31,8 @@ export function AuthForm({ mode }: AuthFormProps) {
     try {
       if (isRegister) {
         const normalizedUsername = username.trim()
-        if (!/^[\p{L}\p{N}_]{3,24}$/u.test(normalizedUsername)) {
-          setMessage('Username harus 3–24 karakter, hanya huruf, angka, atau garis bawah.')
+        if (!/^[a-z0-9._]{3,20}$/.test(normalizedUsername)) {
+          setMessage('Username harus 3–20 karakter: huruf kecil, angka, titik, atau garis bawah.')
           return
         }
         const { data: available, error: availabilityError } = await supabase.rpc('is_username_available', {
@@ -97,13 +98,12 @@ export function AuthForm({ mode }: AuthFormProps) {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b0b0f] px-4 py-10 text-white sm:px-6">
+    <main className="relative flex min-h-screen items-center justify-center overflow-x-clip bg-[#0b0b0f] px-4 py-10 text-white sm:px-6">
       <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-10 size-72 rounded-full bg-blue-600/20 blur-[110px]" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-0 size-80 rounded-full bg-purple-600/20 blur-[120px]" />
       <section className="relative z-10 w-full max-w-[420px] rounded-[28px] border border-white/10 bg-[#121218]/90 p-6 shadow-2xl shadow-purple-950/30 backdrop-blur-xl sm:p-8">
-        <Link href="/" className="mb-8 inline-flex items-center gap-2.5" aria-label="Anis Mart">
-          <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 shadow-lg shadow-purple-900/40"><Sparkles aria-hidden="true" className="size-5" /></span>
-          <span className="font-display text-2xl font-extrabold tracking-tight">Anis<span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">Mart</span></span>
+        <Link href="/" className="mb-8 flex w-full justify-center" aria-label="Anis Mart, ke beranda">
+          <BrandLogo variant="auth" showText={false} />
         </Link>
         <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-blue-300">{isRegister ? 'Selamat datang' : 'Senang bertemu kembali'}</p>
         <h1 className="font-display text-3xl font-extrabold tracking-tight">{isRegister ? 'Buat akun' : 'Masuk ke akun'}</h1>
@@ -111,8 +111,8 @@ export function AuthForm({ mode }: AuthFormProps) {
 
         <form className="mt-7 flex flex-col gap-4" onSubmit={handleSubmit}>
           {isRegister && <label className="flex flex-col gap-2 text-sm font-medium text-gray-200">Username
-            <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" minLength={3} maxLength={24} required placeholder="contoh: anis_mart" className="h-12 rounded-xl border border-white/10 bg-[#0b0b0f] px-4 text-base text-white outline-none transition placeholder:text-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20" />
-            <span className="text-xs font-normal text-gray-500">3–24 karakter, huruf, angka, dan garis bawah.</span>
+            <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" autoCapitalize="none" minLength={3} maxLength={20} required placeholder="contoh: anis.mart" className="h-12 rounded-xl border border-white/10 bg-[#0b0b0f] px-4 text-base text-white outline-none transition placeholder:text-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20" />
+            <span className="text-xs font-normal text-gray-500">3–20 karakter, huruf kecil, angka, titik, dan garis bawah.</span>
           </label>}
           <label className="flex flex-col gap-2 text-sm font-medium text-gray-200">Alamat email
             <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required placeholder="nama@email.com" className="h-12 rounded-xl border border-white/10 bg-[#0b0b0f] px-4 text-base text-white outline-none transition placeholder:text-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20" />

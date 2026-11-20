@@ -1,15 +1,35 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react'
-import { SiteHeader } from '@/components/storefront/site-header'
+import { AdminConsole } from '@/components/admin/admin-console'
 import { createClient } from '@/lib/supabase/server'
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
-  const { data: profile } = await supabase.from('profiles').select('role, username').eq('id', user.id).maybeSingle()
+  const { data: profile } = await supabase.from('profiles').select('role, username, display_name, avatar_url, is_active').eq('id', user.id).maybeSingle()
+  if (profile?.is_active === false) redirect('/akun-nonaktif')
   if (profile?.role !== 'admin') redirect('/')
 
-  return <div className="min-h-screen bg-[#0b0b0f] text-white"><SiteHeader username={profile.username} email={user.email ?? ''} role="admin" onSearch={() => {}} /><main className="px-4 py-10 sm:px-6"><div className="mx-auto max-w-4xl"><Link href="/" className="inline-flex min-h-11 items-center gap-2 text-sm text-gray-400 transition hover:text-white"><ArrowLeft className="size-4" aria-hidden="true" />Kembali ke katalog</Link><section className="mt-6 rounded-3xl border border-white/10 bg-[#121218] p-6 sm:p-9"><div className="mb-5 grid size-12 place-items-center rounded-2xl bg-gradient-to-br from-blue-600 to-violet-600"><ShieldCheck className="size-6" aria-hidden="true" /></div><p className="text-xs font-bold uppercase tracking-[.18em] text-violet-300">Area terbatas</p><h1 className="mt-2 font-display text-3xl font-extrabold">Dashboard Admin</h1><p className="mt-3 max-w-xl text-sm leading-relaxed text-gray-400">Halo, {profile.username}. Halaman placeholder admin ini hanya dapat diakses akun dengan role admin.</p><div className="mt-8 flex items-center gap-3 rounded-2xl border border-white/10 bg-[#0b0b0f] p-4"><Sparkles className="size-5 text-blue-300" aria-hidden="true" /><p className="text-sm text-gray-300">Panel pengelolaan Anis Mart akan ditambahkan di sini.</p></div></section></div></main></div>
+  const [productsResult, ordersResult, customersResult, settingsResult, paymentMethodsResult, params] = await Promise.all([
+    supabase.from('products').select('id, sku, name, category, price, promo_price, extra_shipping_fee, stock, is_active, image_url, image_path, description, unit_size, unit_label, unit_note, created_at').order('created_at', { ascending: false }),
+    supabase.from('orders').select('id, user_id, subtotal, shipping_fee, total_price, shipping_address, delivery_method, payment_method, payment_status, status, created_at, profiles(username), order_items(quantity, price, products(name))').order('created_at', { ascending: false }),
+    supabase.rpc('admin_list_customers'),
+    supabase.from('store_settings').select('id, store_name, store_lat, store_lng, store_address, tarif_dasar, tarif_per_km, jarak_gratis_km, maks_jarak_km, ongkir_minimum, gratis_ongkir_min_belanja, updated_at').eq('id', true).maybeSingle(),
+    supabase.from('payment_methods').select('id, label, deskripsi, is_active, urutan').order('urutan'),
+    searchParams,
+  ])
+  const errors = [productsResult.error, ordersResult.error, customersResult.error, settingsResult.error, paymentMethodsResult.error].filter(Boolean).map((error) => error!.message)
+
+  return <AdminConsole
+    username={profile.username ?? 'Admin'}
+    displayName={profile.display_name?.trim() || profile.username || 'Admin'}
+    email={user.email ?? ''}
+    avatarUrl={profile.avatar_url}
+    products={(productsResult.data ?? []) as never[]}
+    orders={(ordersResult.data ?? []) as never[]}
+    customers={(customersResult.data ?? []) as never[]}
+    settings={(settingsResult.data ?? { id: true, store_name: 'Anis Mart', store_lat: -7.2575, store_lng: 112.7521, store_address: 'Alamat toko belum diatur', tarif_dasar: 0, tarif_per_km: 3000, jarak_gratis_km: 0, maks_jarak_km: 25, ongkir_minimum: 5000, gratis_ongkir_min_belanja: null, updated_at: new Date().toISOString() }) as never}
+    paymentMethods={(paymentMethodsResult.data ?? []) as never[]}
+    error={params.error ?? (errors.length ? `Sebagian data tidak dapat dimuat: ${errors.join(' · ')}` : undefined)}
+  />
 }
