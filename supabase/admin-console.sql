@@ -60,7 +60,7 @@ drop policy if exists "orders_read_owner_or_admin" on public.orders;
 drop policy if exists "orders_admin_update" on public.orders;
 drop policy if exists "order_items_read_owner_or_admin" on public.order_items;
 
-revoke all on public.profiles, public.products, public.orders, public.order_items from anon, authenticated;
+revoke all on public.profiles, public.products, public.orders, public.order_items from public, anon, authenticated;
 grant select on public.profiles to authenticated;
 grant update (is_active) on public.profiles to authenticated;
 grant select, insert, update, delete on public.products to authenticated;

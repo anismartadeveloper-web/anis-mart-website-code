@@ -10,7 +10,7 @@ import { ProductManager } from '@/components/admin/product-manager'
 import { StoreSettingsPanel } from '@/components/admin/store-settings-panel'
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 
-type Product = { id: string; sku: string; name: string; category: 'Snack' | 'Minuman'; price: number; promo_price: number | null; extra_shipping_fee: number; stock: number; is_active: boolean; image_url: string | null; image_path: string | null; description: string | null; created_at: string }
+type Product = { id: string; sku: string; name: string; category: 'Snack' | 'Minuman'; price: number; promo_price: number | null; extra_shipping_fee: number; stock: number; is_active: boolean; image_url: string | null; image_path: string | null; description: string | null; unit_size: number | null; unit_label: string | null; unit_note: string | null; created_at: string }
 type Customer = { id: string; username: string; email: string; role: string; is_active: boolean; created_at: string }
 type OrderItem = { quantity: number; price: number; products: { name: string } | null }
 type Order = { id: string; user_id: string; subtotal: number; shipping_fee: number; total_price: number; shipping_address: string; delivery_method: string; payment_method: string; payment_status: string; status: string; created_at: string; profiles: { username: string } | null; order_items: OrderItem[] }

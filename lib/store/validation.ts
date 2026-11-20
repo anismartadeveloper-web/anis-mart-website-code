@@ -1,6 +1,17 @@
 import { z } from 'zod'
 
+const unitSizeSchema = z.union([z.number(), z.string()]).nullable()
+  .transform((value) => value === null || value === '' ? null : typeof value === 'string' ? Number(value.replace(',', '.')) : value)
+  .pipe(z.number().finite('Ukuran harus berupa angka yang valid.').positive('Ukuran harus lebih dari 0.').nullable())
+const optionalUnitText = (maximum: number, label: string) => z.union([z.string(), z.null()])
+  .transform((value) => typeof value === 'string' ? value.trim() || null : null)
+  .pipe(z.string().max(maximum, `${label} maksimal ${maximum} karakter.`).nullable())
+
 export const productSchema = z.object({
+  sku: z.string().trim().toUpperCase().regex(/^[A-Z]{2,4}-\d{3,}$/, 'SKU harus mengikuti format ABC-001.'),
+  unit_size: unitSizeSchema,
+  unit_label: optionalUnitText(12, 'Satuan'),
+  unit_note: optionalUnitText(120, 'Keterangan isi'),
   name: z.string().trim().min(2, 'Nama minimal 2 karakter.').max(120),
   category: z.enum(['Snack', 'Minuman']),
   price: z.number().finite().positive('Harga normal harus lebih dari 0.').max(1_000_000_000),
@@ -14,6 +25,9 @@ export const productSchema = z.object({
 }).refine((value) => value.promo_price === null || value.promo_price < value.price, {
   message: 'Harga promo harus lebih rendah dari harga normal.',
   path: ['promo_price'],
+}).refine((value) => value.unit_size === null || Boolean(value.unit_label), {
+  message: 'Pilih satuan jika ukuran/isi diisi.',
+  path: ['unit_label'],
 })
 
 export type ProductInput = z.infer<typeof productSchema>

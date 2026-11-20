@@ -11,7 +11,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (profile?.role !== 'admin') redirect('/')
 
   const [productsResult, ordersResult, customersResult, settingsResult, paymentMethodsResult, params] = await Promise.all([
-    supabase.from('products').select('id, sku, name, category, price, promo_price, extra_shipping_fee, stock, is_active, image_url, image_path, description, created_at').order('created_at', { ascending: false }),
+    supabase.from('products').select('id, sku, name, category, price, promo_price, extra_shipping_fee, stock, is_active, image_url, image_path, description, unit_size, unit_label, unit_note, created_at').order('created_at', { ascending: false }),
     supabase.from('orders').select('id, user_id, subtotal, shipping_fee, total_price, shipping_address, delivery_method, payment_method, payment_status, status, created_at, profiles(username), order_items(quantity, price, products(name))').order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, username, email, role, is_active, created_at').eq('role', 'user').order('created_at', { ascending: false }),
     supabase.from('store_settings').select('id, store_name, store_lat, store_lng, store_address, tarif_dasar, tarif_per_km, jarak_gratis_km, maks_jarak_km, ongkir_minimum, gratis_ongkir_min_belanja, updated_at').eq('id', true).maybeSingle(),

@@ -5,6 +5,7 @@ import Image from 'next/image'
 import imageCompression from 'browser-image-compression'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 import { toast } from 'sonner'
 import { ImagePlus, PackagePlus, Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,22 +15,59 @@ import { createProduct, deleteProduct, updateProduct } from '@/app/admin/actions
 import { createClient } from '@/lib/supabase/client'
 import { productSchema, type ProductInput } from '@/lib/store/validation'
 
-type Product = ProductInput & { id: string; sku: string; created_at: string }
+type Product = ProductInput & { id: string; created_at: string }
+const unitOptions = ['g', 'kg', 'ml', 'L', 'pcs', 'pack', 'botol', 'sachet', 'dus'] as const
+const skuPrefix = (category: ProductInput['category']) => category === 'Snack' ? 'NS' : 'MN'
+function nextSku(existingSkus: string[], category: ProductInput['category'], currentSku?: string) {
+  const prefix = skuPrefix(category)
+  const currentNumber = existingSkus.reduce((highest, sku) => {
+    if (sku === currentSku) return highest
+    const match = sku.match(new RegExp(`^${prefix}-(\\d+)$`, 'i'))
+    return match ? Math.max(highest, Number(match[1])) : highest
+  }, 0)
+  return `${prefix}-${String(currentNumber + 1).padStart(3, '0')}`
+}
 const fieldClass = 'min-h-11 w-full rounded-xl border border-white/10 bg-[#0b0b0f] px-3.5 text-sm text-white outline-none transition placeholder:text-gray-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20'
 const money = (value: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(value)
 
-function ProductForm({ product, onSaved, onCancel }: { product?: Product; onSaved?: () => void; onCancel?: () => void }) {
+function ProductForm({ product, existingSkus, onSaved, onCancel }: { product?: Product; existingSkus: string[]; onSaved?: () => void; onCancel?: () => void }) {
   const [busy, startTransition] = useTransition()
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [preview, setPreview] = useState(product?.image_url ?? null)
-  const form = useForm<ProductInput>({
+  const [skuEditable, setSkuEditable] = useState(!product)
+  const [skuMode, setSkuMode] = useState<'automatic' | 'manual'>('automatic')
+  const [skuValue, setSkuValue] = useState(product?.sku ?? nextSku(existingSkus, 'Snack'))
+  const [skuError, setSkuError] = useState<string | null>(null)
+  const [unitIsOther, setUnitIsOther] = useState(Boolean(product?.unit_label && !unitOptions.includes(product.unit_label as typeof unitOptions[number])))
+  const form = useForm<z.input<typeof productSchema>, unknown, ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: product ?? {
+      sku: skuValue, unit_size: null, unit_label: null, unit_note: null,
       name: '', category: 'Snack', price: 10000, promo_price: null, stock: 0,
       extra_shipping_fee: 0, is_active: true, image_url: null, image_path: null, description: null,
     },
   })
   const errors = form.formState.errors
+
+  function updateAutomaticSku(category: ProductInput['category']) {
+    if (skuMode !== 'automatic' || (product && !skuEditable)) return
+    const next = nextSku(existingSkus, category, product?.sku)
+    setSkuValue(next)
+    form.setValue('sku', next, { shouldDirty: true, shouldValidate: true })
+    setSkuError(null)
+  }
+
+  async function checkSkuUnique(value: string) {
+    const normalized = value.trim().toUpperCase()
+    setSkuValue(normalized)
+    form.setValue('sku', normalized, { shouldDirty: true, shouldValidate: true })
+    if (!/^[A-Z]{2,4}-\d{3,}$/.test(normalized)) {
+      setSkuError(null)
+      return
+    }
+    const { data, error } = await createClient().from('products').select('id').ilike('sku', normalized).neq('id', product?.id ?? '').maybeSingle()
+    setSkuError(error ? 'SKU belum dapat diperiksa. Coba lagi.' : data ? 'SKU sudah dipakai.' : null)
+  }
 
   async function chooseImage(file?: File) {
     if (!file) return
@@ -67,7 +105,14 @@ function ProductForm({ product, onSaved, onCancel }: { product?: Product; onSave
         else await createProduct(nextValues)
         toast.success(product ? 'Perubahan produk disimpan.' : 'Produk baru berhasil ditambahkan.')
         onSaved?.()
-        if (!product) form.reset({ name: '', category: 'Snack', price: 10000, promo_price: null, stock: 0, extra_shipping_fee: 0, is_active: true, image_url: null, image_path: null, description: null })
+        if (!product) {
+          const next = nextSku([...existingSkus, values.sku], 'Snack')
+          setSkuValue(next)
+          setSkuMode('automatic')
+          setSkuError(null)
+          setUnitIsOther(false)
+          form.reset({ sku: next, unit_size: null, unit_label: null, unit_note: null, name: '', category: 'Snack', price: 10000, promo_price: null, stock: 0, extra_shipping_fee: 0, is_active: true, image_url: null, image_path: null, description: null })
+        }
       } catch (error) {
         if (uploadedPath) await createClient().storage.from('product-images').remove([uploadedPath])
         toast.error(error instanceof Error ? error.message : 'Produk gagal disimpan.')
@@ -78,16 +123,49 @@ function ProductForm({ product, onSaved, onCancel }: { product?: Product; onSave
   return (
     <form onSubmit={form.handleSubmit(submit)} className="flex flex-col gap-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">SKU
-          <input className={fieldClass} value={product?.sku ?? 'Dibuat otomatis saat disimpan'} readOnly aria-label="SKU produk" />
-        </label>
+        <div className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">
+          <label htmlFor="product-sku">SKU</label>
+          <input id="product-sku" className={fieldClass} value={skuValue} readOnly={!skuEditable || skuMode === 'automatic'} onChange={(event) => { const value = event.target.value.toUpperCase(); setSkuValue(value); form.setValue('sku', value, { shouldDirty: true, shouldValidate: true }); setSkuError(null) }} onBlur={() => { if (skuMode === 'manual' && skuEditable) void checkSkuUnique(skuValue) }} aria-describedby="sku-help" />
+          {(!product || skuEditable) && <div className="flex min-h-10 gap-2" role="group" aria-label="Mode SKU">
+            <button type="button" onClick={() => { setSkuMode('automatic'); const next = nextSku(existingSkus, form.getValues('category'), product?.sku); setSkuValue(next); form.setValue('sku', next, { shouldDirty: true, shouldValidate: true }); setSkuError(null) }} aria-pressed={skuMode === 'automatic'} className={`min-h-10 flex-1 rounded-lg border px-3 text-xs font-semibold ${skuMode === 'automatic' ? 'border-violet-400 bg-violet-500/15 text-white' : 'border-white/10 text-gray-400'}`}>Otomatis</button>
+            <button type="button" onClick={() => { setSkuMode('manual'); setSkuError(null) }} aria-pressed={skuMode === 'manual'} className={`min-h-10 flex-1 rounded-lg border px-3 text-xs font-semibold ${skuMode === 'manual' ? 'border-violet-400 bg-violet-500/15 text-white' : 'border-white/10 text-gray-400'}`}>Manual</button>
+          </div>}
+          {product && !skuEditable && <button type="button" onClick={() => { setSkuEditable(true); setSkuMode('manual') }} className="min-h-10 self-start px-1 text-xs font-semibold text-blue-300 hover:text-blue-200">Ubah SKU</button>}
+          {product && skuEditable && <p className="text-[11px] text-amber-200">Mengubah SKU memengaruhi pencatatan produk.</p>}
+          <p id="sku-help" className="text-[11px] text-gray-500">Format: 2–4 huruf kapital, tanda hubung, minimal 3 angka.</p>
+          {skuError && <span role="alert" className="text-rose-300">{skuError}</span>}
+          {errors.sku && <span role="alert" className="text-rose-300">{errors.sku.message}</span>}
+        </div>
         <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Nama produk
           <input className={fieldClass} maxLength={120} {...form.register('name')} placeholder="Contoh: Keripik singkong" />
           {errors.name && <span className="text-rose-300">{errors.name.message}</span>}
         </label>
         <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Kategori
-          <select className={fieldClass} {...form.register('category')}><option value="Snack">Snack</option><option value="Minuman">Minuman</option></select>
+          <select className={fieldClass} {...form.register('category', { onChange: (event) => updateAutomaticSku(event.target.value) })}><option value="Snack">Snack</option><option value="Minuman">Minuman</option></select>
         </label>
+        <div className="flex flex-col gap-3 sm:col-span-2 sm:grid sm:grid-cols-2 sm:items-start">
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Ukuran/Isi (opsional)
+            <input className={fieldClass} type="text" inputMode="decimal" placeholder="Contoh: 250 atau 1,5" {...form.register('unit_size', { setValueAs: (value) => { if (value === '' || value == null) return null; const parsed = Number(String(value).replace(',', '.')); return Number.isFinite(parsed) ? parsed : Number.NaN } })} />
+            {errors.unit_size && <span role="alert" className="text-rose-300">{errors.unit_size.message}</span>}
+          </label>
+          <div className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">
+            <label htmlFor="unit-label">Satuan</label>
+            <select id="unit-label" className={fieldClass} value={unitIsOther ? 'other' : form.watch('unit_label') ?? ''} onChange={(event) => {
+              const value = event.target.value
+              setUnitIsOther(value === 'other')
+              form.setValue('unit_label', value === 'other' || !value ? null : value, { shouldDirty: true, shouldValidate: true })
+            }}>
+              <option value="">Pilih satuan</option>{unitOptions.map((unit) => <option key={unit} value={unit}>{unit}</option>)}<option value="other">Lainnya</option>
+            </select>
+            {unitIsOther && <input className={fieldClass} type="text" maxLength={12} value={form.watch('unit_label') ?? ''} onChange={(event) => form.setValue('unit_label', event.target.value, { shouldDirty: true, shouldValidate: true })} placeholder="Tulis satuan (maks. 12 karakter)" aria-label="Satuan lainnya" />}
+            {errors.unit_label && <span role="alert" className="text-rose-300">{errors.unit_label.message}</span>}
+          </div>
+          {form.watch('unit_size') !== null && form.watch('unit_size') !== undefined && Number.isFinite(form.watch('unit_size')) && Number(form.watch('unit_size')) > 0 && form.watch('unit_label') && <p className="text-xs text-gray-400 sm:col-span-2">Pratinjau: {new Intl.NumberFormat('id-ID', { maximumFractionDigits: 6 }).format(Number(form.watch('unit_size')))} {form.watch('unit_label')}</p>}
+          <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300 sm:col-span-2">Keterangan isi (opsional)
+            <input className={fieldClass} type="text" maxLength={120} placeholder="Contoh: isi 10 pcs atau 1 pack @ 15 gram" {...form.register('unit_note', { setValueAs: (value) => String(value ?? '').trim() || null })} />
+            {errors.unit_note && <span role="alert" className="text-rose-300">{errors.unit_note.message}</span>}
+          </label>
+        </div>
         <label className="flex flex-col gap-1.5 text-xs font-medium text-gray-300">Harga normal (Rp)
           <input className={fieldClass} type="number" min="1" step="1" {...form.register('price', { valueAsNumber: true })} />
           {errors.price && <span className="text-rose-300">{errors.price.message}</span>}
@@ -121,7 +199,7 @@ function ProductForm({ product, onSaved, onCancel }: { product?: Product; onSave
       </div>
 
       <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[.03] px-3.5 py-3">
-        <div><p className="text-sm font-medium text-white">Tampilkan di katalog</p><p className="mt-0.5 text-xs text-gray-400">SKU {product?.sku ?? 'dibuat otomatis saat disimpan'}</p></div>
+        <div><p className="text-sm font-medium text-white">Tampilkan di katalog</p><p className="mt-0.5 text-xs text-gray-400">SKU {skuValue}</p></div>
         <Switch checked={form.watch('is_active')} onCheckedChange={(checked) => form.setValue('is_active', checked, { shouldDirty: true })} aria-label="Produk aktif di katalog" />
       </div>
       {errors.root && <p role="alert" className="text-sm text-rose-300">{errors.root.message}</p>}
@@ -153,8 +231,8 @@ function ProductManagerContent({ products }: { products: Product[] }) {
 
   return <div className="flex flex-col gap-7">
     <section className="rounded-2xl border border-violet-400/15 bg-gradient-to-br from-blue-600/[.08] to-violet-600/[.08] p-4 sm:p-6">
-      <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-violet-500/15 text-violet-200"><PackagePlus className="size-5" /></span><div><h3 className="font-display font-bold">Tambah produk</h3><p className="text-xs text-gray-400">SKU kategori dibuat otomatis saat disimpan.</p></div></div>
-      <ProductForm />
+      <div className="mb-4 flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-violet-500/15 text-violet-200"><PackagePlus className="size-5" /></span><div><h3 className="font-display font-bold">Tambah produk</h3><p className="text-xs text-gray-400">SKU berikutnya mengikuti kategori, dan bisa diatur manual.</p></div></div>
+      <ProductForm existingSkus={products.map((product) => product.sku)} />
     </section>
     <section>
       <h3 className="mb-3 font-display text-lg font-bold">Semua produk <span className="text-sm font-medium text-gray-500">({products.length})</span></h3>
@@ -166,7 +244,7 @@ function ProductManagerContent({ products }: { products: Product[] }) {
               <DialogTrigger render={<Button variant="outline" size="sm" onClick={() => setEditing(product)} />}><Pencil /> Edit</DialogTrigger>
               <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader><DialogTitle>Edit produk</DialogTitle><DialogDescription>Perbarui harga, promo, stok, foto, dan status katalog.</DialogDescription></DialogHeader>
-                {editing?.id === product.id && <ProductErrorBoundary key={product.id}><ProductForm product={product} onSaved={() => setEditing(null)} onCancel={() => setEditing(null)} /></ProductErrorBoundary>}
+                {editing?.id === product.id && <ProductErrorBoundary key={product.id}><ProductForm product={product} existingSkus={products.map((item) => item.sku)} onSaved={() => setEditing(null)} onCancel={() => setEditing(null)} /></ProductErrorBoundary>}
               </DialogContent>
             </Dialog>
             <Button variant="destructive" size="sm" disabled={busyId === product.id} onClick={() => removeProduct(product)}><Trash2 /> Hapus</Button>
