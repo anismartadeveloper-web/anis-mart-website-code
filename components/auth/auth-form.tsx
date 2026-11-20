@@ -103,7 +103,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       <div aria-hidden="true" className="pointer-events-none absolute -right-20 bottom-0 size-80 rounded-full bg-purple-600/20 blur-[120px]" />
       <section className="relative z-10 w-full max-w-[420px] rounded-[28px] border border-white/10 bg-[#121218]/90 p-6 shadow-2xl shadow-purple-950/30 backdrop-blur-xl sm:p-8">
         <Link href="/" className="mb-8 flex w-full justify-center" aria-label="Anis Mart, ke beranda">
-          <BrandLogo variant="auth" />
+          <BrandLogo variant="auth" showText={false} />
         </Link>
         <p className="mb-2 text-xs font-bold uppercase tracking-[.18em] text-blue-300">{isRegister ? 'Selamat datang' : 'Senang bertemu kembali'}</p>
         <h1 className="font-display text-3xl font-extrabold tracking-tight">{isRegister ? 'Buat akun' : 'Masuk ke akun'}</h1>

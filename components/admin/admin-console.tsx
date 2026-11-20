@@ -55,14 +55,14 @@ export function AdminConsole({ username, displayName, email, avatarUrl, products
   return <div className="min-h-screen bg-[#0b0b0f] text-white">
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#0b0b0f]/90 backdrop-blur-xl">
       <div className="mx-auto flex min-h-16 max-w-[1500px] items-center justify-between gap-2 px-3 sm:px-6 lg:px-8">
-        <Link href="/" className="flex shrink-0 items-center" aria-label="Anis Mart, ke beranda"><BrandLogo variant="header" /></Link>
+        <Link href="/" className="flex shrink-0 items-center" aria-label="Anis Mart, ke beranda"><BrandLogo variant="header" showText /></Link>
         <div className="flex min-w-0 items-center gap-2"><span className="hidden text-sm text-gray-400 sm:block">Halo, {displayName}</span><Link href="/akun" aria-label="Buka info akun" className="grid size-10 shrink-0 place-items-center rounded-full border border-white/10 transition hover:border-violet-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"><AccountAvatar src={avatarUrl} name={displayName} size="size-8" /></Link><Link href="/" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2.5 text-xs font-semibold text-gray-200 transition hover:bg-white/10 sm:gap-2 sm:px-4 sm:text-sm"><ExternalLink className="size-4" />Lihat Toko</Link></div>
       </div>
       <div className="mx-auto flex max-w-[1500px] justify-end px-4 pb-3 lg:hidden">
         <Sheet>
           <SheetTrigger render={<button type="button" className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 text-sm font-semibold text-gray-200"><Menu className="size-4" />Navigasi admin</button>} />
           <SheetContent side="left" className="border-white/10 bg-[#101016] text-white">
-            <SheetHeader className="min-h-32 flex-row items-center border-b border-white/10 pr-16"><BrandLogo variant="sidebar" /><SheetTitle className="sr-only">Menu Admin</SheetTitle></SheetHeader>
+            <SheetHeader className="min-h-32 flex-row items-center border-b border-white/10 pr-16"><BrandLogo variant="sidebar" showText /><SheetTitle className="sr-only">Menu Admin</SheetTitle></SheetHeader>
             <div className="px-4 pb-3"><AccountCard username={username} displayName={displayName} email={email} role="admin" avatarUrl={avatarUrl} /></div>
             <nav className="flex flex-col gap-1 px-4" aria-label="Navigasi Admin Console">{sections.map(({ name, icon: Icon }) => <SheetClose key={name} render={<button type="button" onClick={() => setSection(name)} aria-current={section === name ? 'page' : undefined} className={`flex min-h-12 items-center gap-3 rounded-xl px-3 text-left text-sm font-medium ${section === name ? 'bg-violet-500/20 text-violet-100' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`} />}><Icon className="size-4" />{name}</SheetClose>)}</nav>
           </SheetContent>
